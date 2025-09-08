@@ -1,0 +1,8 @@
+# IMDb Analytics Project Requirements
+# Minimum versions needed to run the data loader script
+
+# Python version
+python>=3.13.5
+
+# Database connection
+psycopg2-binary>=2.9.10
