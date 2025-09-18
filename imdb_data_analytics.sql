@@ -9,7 +9,7 @@ WHERE region = 'US'
 ORDER BY 
 	titleid,
 	CASE WHEN types='imdbDisplay' THEN 0 ELSE 1 END,
-    ordering
+    ordering;
 
 /* 
 View to select all the movies for the region US, with a distinct prioritizing imdbDisplay as display type and
@@ -17,7 +17,14 @@ a lower ordering value since the combination titleid/ordering is the Primary Key
 */
 
 
--- 1) Top Movies - Bayesian Rating
+-- ############################################################
+-- QUERY 1: Top Movies — Bayesian Ranking
+-- Objective: Rank movies using a Bayesian estimate to avoid instability from low-vote titles.
+-- Logic: Combine each movie’s own rating (R) with the global mean (C), weighted by its votes (v)
+--        against a prior weight (m), where m = p80(numvotes):
+--            score = (v/(v+m)) * R  +  (m/(v+m)) * C
+--        Thus, more votes → more influence of the movie’s rating; few votes → pull towards C.
+-- ############################################################
 
 WITH stats AS( 
 SELECT 
@@ -31,20 +38,21 @@ SELECT us.titleid,
 	us.title,
 	r.numvotes,
 	r.averagerating AS original_rating,
-	round(((r.numvotes / (r.numvotes + s.p80_nr_votes)) * r.averagerating + (s.p80_nr_votes / (r.numvotes + s.p80_nr_votes)) * s.global_mean)::numeric, 2) as bayesian_rating
+	round(((r.numvotes / (r.numvotes + s.p80_nr_votes)) * r.averagerating + (s.p80_nr_votes / (r.numvotes + s.p80_nr_votes)) * s.global_mean)::numeric, 2) as bayesian_ranking
 FROM us_display_title us
 JOIN title_ratings r ON r.tconst = us.titleid
 CROSS JOIN stats s
 ORDER BY 
-	bayesian_rating DESC
-
-/* 
-The Bayesian Rating takes into account the number of votes that a given movie received to balance out it´s rating, and thus, 
-for example, preventing movies that got a 10.0 rating with only two votes from being at the top of the scoreboard. 
-*/
+	bayesian_ranking DESC;
 
 
--- 2) Top Movies per Decade-Genre
+-- ############################################################
+-- QUERY 2: Movies per Decade & Genre
+-- Objective: Count movies produced per decade and genre to
+--            identify industry trends and cycles.
+-- Logic: Derives decade from start year, explodes genre array,
+--        groups and counts.
+-- ############################################################
 
 SELECT
 	(b.startyear - (b.startyear % 10))::text || 's' AS decade,
@@ -56,10 +64,15 @@ CROSS JOIN LATERAL UNNEST(string_to_array(b.genres, ',')) AS g
 WHERE b.startyear IS NOT NULL
 GROUP BY decade, genre
 ORDER BY 
-	movies_produced DESC
+	movies_produced DESC;
 
 
--- 3) Movie Length Trends 
+-- ############################################################
+-- QUERY 3: Movie Length Trends
+-- Objective: Analyze how runtime evolves over time (distribution).
+-- Logic: Aggregates avg, stddev, and quartiles by year, filtering
+--        for years with >500 movies for robustness.
+-- ############################################################
 
 SELECT
 	b.startyear AS year,
@@ -75,10 +88,15 @@ WHERE b.startyear IS NOT NULL AND b.runtimeminutes IS NOT NULL
 GROUP BY year
 HAVING COUNT(*) > 500
 ORDER BY 
-	year DESC
+	year DESC;
 
 
--- 4) Genre Affinity
+-- ############################################################
+-- QUERY 4: Genre Affinity
+-- Objective: Find genre pairs that often co-occur in the same movie.
+-- Logic: Explodes genres per title, self-joins to form pairs,
+--        counts co-occurrences, orders by frequency.
+-- ############################################################
 
 WITH exploded AS (
 SELECT
@@ -108,10 +126,18 @@ SELECT
 FROM pairs
 GROUP BY genre_1, genre_2
 ORDER BY 
-	titles_with_both_genres DESC
+	titles_with_both_genres DESC;
 
 
--- 5) Director Consistency - Weighted Log Rating
+-- ############################################################
+-- QUERY 5: Director Consistency
+-- Objective: Identify directors with consistent quality across their filmography.
+-- Logic: For each director, compute a log-weighted average of movie ratings:
+--            w_avg = sum( ln(votes) * rating ) / sum( ln(votes) )
+--        Using ln(votes) dampens the dominance of mega-hit films (very high vote counts),
+--        yielding a more balanced view than a simple average or a linear vote weighting.
+--        Also show the simple average for reference.
+-- ############################################################
 
 WITH dir_titles AS (                           
 SELECT 
@@ -121,6 +147,7 @@ FROM title_principals p
 JOIN us_display_title us ON us.titleid = p.tconst
 WHERE p.category = 'director'
 ),
+
 rated AS (                                  
 SELECT 
 	d.nconst, 
@@ -133,6 +160,7 @@ WHERE
 	r.averagerating IS NOT NULL
 	AND r.numvotes > 1
 )
+
 SELECT
 	n.primaryname AS director,
 	COUNT(DISTINCT r.tconst) AS n_movies,
@@ -145,20 +173,17 @@ GROUP BY n.primaryname
 HAVING COUNT(DISTINCT r.tconst) >= 3        
 ORDER BY 
 	n_votes DESC, 
-	n_movies DESC
-
-/*
-The Weighted Log Rating calculates a director’s average score by weighting each film’s rating with the natural logarithm
-of its number of votes. This way, films with a larger audience have a stronger influence on the director’s overall score,
-while still preventing extremely popular films from completely overshadowing smaller ones (due to the dampening effect
-of the logarithm). 
-*/
+	n_movies DESC;
 
 
--- 6) Recurrent Actor–Actor Pairs
+-- ############################################################
+-- QUERY 6: Actor–Actor Pairs
+-- Objective: Detect frequent actor collaborations.
+-- Logic: Builds actor pairs per title (self-join on principals),
+--        counts distinct films together, filters for >=3.
+-- ############################################################
 
 WITH cast_us AS (                   
-
 SELECT 
 	DISTINCT p.tconst, 
 	p.nconst
@@ -189,6 +214,6 @@ HAVING COUNT(DISTINCT p.tconst) >= 3
 ORDER BY 
 	films_together DESC, 
 	actor1, 
-	actor2
+	actor2;
 
 
