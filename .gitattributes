@@ -1,2 +1,8 @@
-# Auto detect text files and perform LF normalization
+# 1) Keep line ending normalization across all files
 * text=auto
+
+# 2) Exclude Jupyter notebooks from language statistics
+*.ipynb linguist-vendored
+
+# (Optional) Mark outputs and generated files so they are ignored in language stats
+outputs/** linguist-generated
