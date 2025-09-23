@@ -65,3 +65,4 @@ Detects recurring actor duos (≥3 movies together). Example: frequent collabora
 For reproducibility, each query stores a **CSV snapshot with the first 50 rows** in the [`/outputs`](outputs) folder.  
 This keeps the repository lightweight in terms of performance and storage.  
 To regenerate full results, run the SQL in [`imdb_data_analytics.sql`](imdb_data_analytics.sql).
+
