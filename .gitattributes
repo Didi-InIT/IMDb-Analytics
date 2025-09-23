@@ -1,8 +1,12 @@
-# 1) Keep line ending normalization across all files
+# Keep line ending normalization across all files
 * text=auto
 
-# 2) Exclude Jupyter notebooks from language statistics
+# Exclude Jupyter notebooks from language statistics
 *.ipynb linguist-vendored
 
-# (Optional) Mark outputs and generated files so they are ignored in language stats
+# Mark outputs as generated (excluded from language stats)
 outputs/** linguist-generated
+
+# --- Force SQL to be detected and shown ---
+*.sql linguist-detectable=true
+*.sql linguist-language=SQL
