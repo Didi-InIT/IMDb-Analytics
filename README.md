@@ -24,6 +24,11 @@ Main tables used:
 
 I created a base **view `us_display_title`** to consistently select one canonical title per movie (region `US`, type `imdbDisplay`).
 
+### Database Schema
+The following database diagram summarizes the core tables and their relationships:
+
+![IMDb Schema](docs/diagram_imbd.png)  
+
 ---
 
 ## ⚙️ How to run
