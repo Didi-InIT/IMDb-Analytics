@@ -1,19 +1,21 @@
 DROP VIEW IF EXISTS us_display_title;
 CREATE VIEW us_display_title AS
 SELECT 
-	DISTINCT ON (titleid) titleid, 
-	ordering,
-	title
-FROM title_akas
-WHERE region = 'US' 
+	DISTINCT ON (a.titleid) a.titleid, 
+	a.ordering,
+	a.title
+FROM title_akas a
+JOIN title_basics b ON a.titleid = b.tconst
+WHERE a.region = 'US' AND b.titletype = 'movie' AND b.runtimeminutes <= 500
 ORDER BY 
-	titleid,
-	CASE WHEN types='imdbDisplay' THEN 0 ELSE 1 END,
-    ordering;
+	a.titleid,
+	CASE WHEN a.types = 'imdbDisplay' THEN 0 ELSE 1 END,
+    a.ordering;
 
 /* 
-View to select all the movies for the region US, with a distinct prioritizing imdbDisplay as display type and
-a lower ordering value since the combination titleid/ordering is the Primary Key of title_akas table.
+View to select all the movies for the US region, with a distinct prioritizing imdbDisplay as display type and
+a lower ordering value since the combination titleid/ordering is the Primary Key of title_akas table. Movies
+with a length greater than 500 minutes were also excluded.
 */
 
 
@@ -38,7 +40,7 @@ SELECT us.titleid,
 	us.title,
 	r.numvotes,
 	r.averagerating AS original_rating,
-	round(((r.numvotes / (r.numvotes + s.p80_nr_votes)) * r.averagerating + (s.p80_nr_votes / (r.numvotes + s.p80_nr_votes)) * s.global_mean)::numeric, 2) as bayesian_ranking
+	ROUND(((r.numvotes / (r.numvotes + s.p80_nr_votes)) * r.averagerating + (s.p80_nr_votes / (r.numvotes + s.p80_nr_votes)) * s.global_mean)::numeric, 1) as bayesian_ranking
 FROM us_display_title us
 JOIN title_ratings r ON r.tconst = us.titleid
 CROSS JOIN stats s
@@ -116,7 +118,7 @@ SELECT
     e1.startyear
 FROM exploded e1
 JOIN exploded e2 ON e1.tconst = e2.tconst
-	AND e1.genre  < e2.genre      -- avoids (A,B) & (B,A) and self-pairs (A,A)
+	AND e1.genre < e2.genre      -- avoids (A,B) & (B,A) and self-pairs (A,A)
 )
 
 SELECT
